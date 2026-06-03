@@ -1,149 +1,162 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local Window = Rayfield:CreateWindow({
-   Name = "OP Executor Hub | Universal",
-   LoadingTitle = "Loading Ultimate Suite...",
-   LoadingSubtitle = "by Helpful AI",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "OP_Hub_Config",
-      FileName = "UniversalConfig"
-   },
-   KeySystem = false
-})
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local Container = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
 
--- Variables
-local Player = game:GetService("Players").LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
+ScreenGui.Name = "CustomOpPanel"
+ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
 
-local ESPEnabled = false
-local TracersEnabled = false
-local FlyEnabled = false
-local FlySpeed = 50
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 200, 0, 300)
+MainFrame.Active = true
+MainFrame.Draggable = true
 
--- Tabs
-local MainTab = Window:CreateTab("Main", 4483362458)
-local PlayerTab = Window:CreateTab("Player", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local ScriptsTab = Window:CreateTab("Scripts", 4483362458)
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "OP PANEL"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
 
--- Main Tab
-MainTab:CreateSection("Universal Utilities")
+Container.Name = "Container"
+Container.Parent = MainFrame
+Container.Active = true
+Container.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Container.BackgroundTransparency = 1.000
+Container.BorderSizePixel = 0
+Container.Position = UDim2.new(0, 5, 0, 35)
+Container.Size = UDim2.new(1, -10, 1, -40)
+Container.CanvasSize = UDim2.new(0, 0, 0, 500)
+Container.ScrollBarThickness = 4
 
-MainTab:CreateButton({
-   Name = "Infinite Yield",
-   Callback = function()
-       loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
-   end,
-})
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
 
-MainTab:CreateButton({
-   Name = "Dex Explorer",
-   Callback = function()
-       loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
-   end,
-})
+-- Utility Functions
+local function CreateButton(text, callback)
+    local Button = Instance.new("TextButton")
+    Button.Name = text .. "Btn"
+    Button.Parent = Container
+    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Button.BorderSizePixel = 0
+    Button.Size = UDim2.new(1, 0, 0, 30)
+    Button.Font = Enum.Font.SourceSans
+    Button.Text = text
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 14
+    
+    Button.MouseButton1Click:Connect(callback)
+    return Button
+end
 
--- Player Tab
-PlayerTab:CreateSection("Movement")
+-- Features Logic
+local noclip = false
+local fly = false
+local esp_enabled = false
 
-PlayerTab:CreateSlider({
-   Name = "WalkSpeed",
-   Range = {16, 500},
-   Increment = 1,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Flag = "WS_Slider",
-   Callback = function(Value)
-       Humanoid.WalkSpeed = Value
-   end,
-})
+RunService.Stepped:Connect(function()
+    if noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
 
-PlayerTab:CreateSlider({
-   Name = "JumpPower",
-   Range = {50, 500},
-   Increment = 1,
-   Suffix = "Power",
-   CurrentValue = 50,
-   Flag = "JP_Slider",
-   Callback = function(Value)
-       Humanoid.UseJumpPower = true
-       Humanoid.JumpPower = Value
-   end,
-})
+-- Buttons
+CreateButton("Speed (100)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 100
+    end
+end)
 
-PlayerTab:CreateToggle({
-   Name = "Fly",
-   CurrentValue = false,
-   Flag = "Fly_Toggle",
-   Callback = function(Value)
-       FlyEnabled = Value
-       if FlyEnabled then
-           local BodyGyro = Instance.new("BodyGyro", Character.PrimaryPart)
-           local BodyVelocity = Instance.new("BodyVelocity", Character.PrimaryPart)
-           BodyGyro.P = 9e4
-           BodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-           BodyGyro.cframe = Character.PrimaryPart.CFrame
-           BodyVelocity.velocity = Vector3.new(0, 0.1, 0)
-           BodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
-           
-           task.spawn(function()
-               while FlyEnabled do
-                   local Camera = workspace.CurrentCamera
-                   BodyVelocity.velocity = ((Camera.CFrame.LookVector * (FlySpeed)) + (Camera.CFrame.RightVector * 0))
-                   BodyGyro.cframe = Camera.CFrame
-                   task.wait()
-               end
-               BodyGyro:Destroy()
-               BodyVelocity:Destroy()
-           end)
-       end
-   end,
-})
+CreateButton("Jump (150)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.JumpPower = 150
+    end
+end)
 
--- Visuals Tab
-VisualsTab:CreateSection("ESP")
+CreateButton("Noclip (Toggle)", function()
+    noclip = not noclip
+    print("Noclip: " .. tostring(noclip))
+end)
 
-VisualsTab:CreateToggle({
-   Name = "Enable ESP Boxes",
-   CurrentValue = false,
-   Flag = "ESP_Toggle",
-   Callback = function(Value)
-       ESPEnabled = Value
-       if ESPEnabled then
-           task.spawn(function()
-               while ESPEnabled do
-                   for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-                       if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-                           if not v.Character:FindFirstChild("Highlight") then
-                               local Highlight = Instance.new("Highlight", v.Character)
-                               Highlight.FillTransparency = 0.5
-                               Highlight.OutlineTransparency = 0
-                               Highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                           end
-                       end
-                   end
-                   task.wait(1)
-               end
-               for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-                   if v.Character and v.Character:FindFirstChild("Highlight") then
-                       v.Character.Highlight:Destroy()
-                   end
-               end
-           end)
-       end
-   end,
-})
+CreateButton("Infinite Yield", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+end)
 
--- Scripts Tab
-ScriptsTab:CreateSection("External Scripts")
+CreateButton("Simple ESP", function()
+    esp_enabled = not esp_enabled
+    if esp_enabled then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESPHighlight"
+                highlight.Parent = p.Character
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            end
+        end
+    else
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("ESPHighlight") then
+                p.Character.ESPHighlight:Destroy()
+            end
+        end
+    end
+end)
 
-ScriptsTab:CreateButton({
-   Name = "Remote Spy",
-   Callback = function()
-       loadstring(game:HttpGet("https://raw.githubusercontent.com/78n/SimpleSpy/main/SimpleSpySource.lua"))()
-   end,
-})
+CreateButton("Fly (E to Toggle)", function()
+    fly = not fly
+    local c = LocalPlayer.Character
+    local h = c:FindFirstChild("Humanoid")
+    local root = c:FindFirstChild("HumanoidRootPart")
+    
+    if fly then
+        local bv = Instance.new("BodyVelocity", root)
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Name = "FlyVelocity"
+        
+        task.spawn(function()
+            while fly do
+                local cam = workspace.CurrentCamera.CFrame
+                local dir = Vector3.new(0,0,0)
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.RightVector end
+                bv.Velocity = dir * 100
+                task.wait()
+            end
+            bv:Destroy()
+        end)
+    end
+end)
 
-Rayfield:LoadConfiguration()
+CreateButton("Full Bright", function()
+    game:GetService("Lighting").Brightness = 2
+    game:GetService("Lighting").ClockTime = 14
+    game:GetService("Lighting").FogEnd = 100000
+    game:GetService("Lighting").GlobalShadows = false
+end)
+
+CreateButton("Destroy UI", function()
+    ScreenGui:Destroy()
+end)
