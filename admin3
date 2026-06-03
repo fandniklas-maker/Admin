@@ -1,162 +1,182 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 
--- UI Setup
+local player = Players.LocalPlayer
+local prefix = "/"
+
+-- UI Creation
 local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local Container = Instance.new("ScrollingFrame")
-local UIListLayout = Instance.new("UIListLayout")
-
-ScreenGui.Name = "CustomOpPanel"
-ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Name = "AdminSystem"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+if gethui then ScreenGui.Parent = gethui() else ScreenGui.Parent = CoreGui end
 
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
-MainFrame.Size = UDim2.new(0, 200, 0, 300)
-MainFrame.Active = true
-MainFrame.Draggable = true
+-- Command Bar
+local CommandBarFrame = Instance.new("Frame")
+CommandBarFrame.Name = "CommandBar"
+CommandBarFrame.Size = UDim2.new(0, 400, 0, 40)
+CommandBarFrame.Position = UDim2.new(0.5, -200, 1, -100)
+CommandBarFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+CommandBarFrame.BorderSizePixel = 0
+CommandBarFrame.Visible = false
+CommandBarFrame.Parent = ScreenGui
 
-Title.Name = "Title"
-Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.BorderSizePixel = 0
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Font = Enum.Font.SourceSansBold
-Title.Text = "OP PANEL"
+local UICorner_CB = Instance.new("UICorner")
+UICorner_CB.CornerRadius = UDim.new(0, 8)
+UICorner_CB.Parent = CommandBarFrame
+
+local TextBox = Instance.new("TextBox")
+TextBox.Size = UDim2.new(1, -20, 1, 0)
+TextBox.Position = UDim2.new(0, 10, 0, 0)
+TextBox.BackgroundTransparency = 1
+TextBox.Font = Enum.Font.GothamSemibold
+TextBox.PlaceholderText = "Enter command..."
+TextBox.Text = ""
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextBox.TextSize = 16
+TextBox.TextXAlignment = Enum.TextXAlignment.Left
+TextBox.Parent = CommandBarFrame
+
+-- Commands Menu
+local MenuFrame = Instance.new("Frame")
+MenuFrame.Name = "Menu"
+MenuFrame.Size = UDim2.new(0, 300, 0, 400)
+MenuFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MenuFrame.BorderSizePixel = 0
+MenuFrame.Visible = false
+MenuFrame.Parent = ScreenGui
+
+local UICorner_Menu = Instance.new("UICorner")
+UICorner_Menu.CornerRadius = UDim.new(0, 10)
+UICorner_Menu.Parent = MenuFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.Text = "COMMAND MENU"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 18
+Title.Parent = MenuFrame
 
-Container.Name = "Container"
-Container.Parent = MainFrame
-Container.Active = true
-Container.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Container.BackgroundTransparency = 1.000
-Container.BorderSizePixel = 0
-Container.Position = UDim2.new(0, 5, 0, 35)
-Container.Size = UDim2.new(1, -10, 1, -40)
-Container.CanvasSize = UDim2.new(0, 0, 0, 500)
-Container.ScrollBarThickness = 4
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 1, -60)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 50)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.ScrollBarThickness = 4
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.Parent = MenuFrame
 
-UIListLayout.Parent = Container
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.Parent = ScrollingFrame
 
--- Utility Functions
-local function CreateButton(text, callback)
-    local Button = Instance.new("TextButton")
-    Button.Name = text .. "Btn"
-    Button.Parent = Container
-    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    Button.BorderSizePixel = 0
-    Button.Size = UDim2.new(1, 0, 0, 30)
-    Button.Font = Enum.Font.SourceSans
-    Button.Text = text
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.TextSize = 14
+-- Logic and Commands
+local commands = {}
+
+local function addCommand(name, aliases, desc, callback)
+    commands[name] = {aliases = aliases, desc = desc, callback = callback}
     
-    Button.MouseButton1Click:Connect(callback)
-    return Button
+    local cmdLabel = Instance.new("TextLabel")
+    cmdLabel.Size = UDim2.new(1, 0, 0, 30)
+    cmdLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    cmdLabel.Font = Enum.Font.Gotham
+    cmdLabel.Text = " " .. prefix .. name .. " - " .. desc
+    cmdLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    cmdLabel.TextSize = 14
+    cmdLabel.TextXAlignment = Enum.TextXAlignment.Left
+    cmdLabel.Parent = ScrollingFrame
+    
+    local UICorner_Label = Instance.new("UICorner")
+    UICorner_Label.CornerRadius = UDim.new(0, 4)
+    UICorner_Label.Parent = cmdLabel
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end
 
--- Features Logic
-local noclip = false
-local fly = false
-local esp_enabled = false
+local function runCommand(input)
+    local args = input:split(" ")
+    local cmdName = args[1]:lower():gsub(prefix, "")
+    table.remove(args, 1)
 
-RunService.Stepped:Connect(function()
-    if noclip and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
+    for name, data in pairs(commands) do
+        local isAlias = false
+        for _, alias in ipairs(data.aliases) do
+            if alias:lower() == cmdName then isAlias = true break end
+        end
+
+        if name:lower() == cmdName or isAlias then
+            data.callback(args)
+            return
+        end
+    end
+end
+
+-- Registering Commands
+addCommand("speed", {"ws", "walkspeed"}, "Set character speed", function(args)
+    local speed = tonumber(args[1]) or 16
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = speed
+    end
+end)
+
+addCommand("jump", {"jp", "jumppower"}, "Set jump power", function(args)
+    local jp = tonumber(args[1]) or 50
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.UseJumpPower = true
+        player.Character.Humanoid.JumpPower = jp
+    end
+end)
+
+addCommand("money", {"cash", "geld", "currency"}, "Set local money (Visual/Leaderstats)", function(args)
+    local amount = tonumber(args[1]) or 0
+    local stats = player:FindFirstChild("leaderstats")
+    if stats then
+        for _, v in ipairs(stats:GetChildren()) do
+            local n = v.Name:lower()
+            if n:find("money") or n:find("cash") or n:find("geld") or n:find("coins") then
+                v.Value = amount
             end
         end
     end
 end)
 
--- Buttons
-CreateButton("Speed (100)", function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = 100
-    end
+addCommand("cmds", {"help", "menu"}, "Open command list", function()
+    MenuFrame.Visible = not MenuFrame.Visible
 end)
 
-CreateButton("Jump (150)", function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.JumpPower = 150
-    end
+addCommand("exit", {"close"}, "Close the menu", function()
+    MenuFrame.Visible = false
 end)
 
-CreateButton("Noclip (Toggle)", function()
-    noclip = not noclip
-    print("Noclip: " .. tostring(noclip))
-end)
-
-CreateButton("Infinite Yield", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-end)
-
-CreateButton("Simple ESP", function()
-    esp_enabled = not esp_enabled
-    if esp_enabled then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "ESPHighlight"
-                highlight.Parent = p.Character
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-            end
-        end
-    else
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character and p.Character:FindFirstChild("ESPHighlight") then
-                p.Character.ESPHighlight:Destroy()
-            end
-        end
-    end
-end)
-
-CreateButton("Fly (E to Toggle)", function()
-    fly = not fly
-    local c = LocalPlayer.Character
-    local h = c:FindFirstChild("Humanoid")
-    local root = c:FindFirstChild("HumanoidRootPart")
+-- Input Handling
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
     
-    if fly then
-        local bv = Instance.new("BodyVelocity", root)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.Name = "FlyVelocity"
-        
-        task.spawn(function()
-            while fly do
-                local cam = workspace.CurrentCamera.CFrame
-                local dir = Vector3.new(0,0,0)
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.RightVector end
-                bv.Velocity = dir * 100
-                task.wait()
-            end
-            bv:Destroy()
-        end)
+    if input.KeyCode == Enum.KeyCode.Semicolon or input.KeyCode == Enum.KeyCode.Slash then
+        CommandBarFrame.Visible = true
+        TextBox:CaptureFocus()
+        task.wait()
+        TextBox.Text = ""
     end
 end)
 
-CreateButton("Full Bright", function()
-    game:GetService("Lighting").Brightness = 2
-    game:GetService("Lighting").ClockTime = 14
-    game:GetService("Lighting").FogEnd = 100000
-    game:GetService("Lighting").GlobalShadows = false
+TextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local text = TextBox.Text
+        if text ~= "" then
+            runCommand(text)
+        end
+    end
+    CommandBarFrame.Visible = false
+    TextBox.Text = ""
 end)
 
-CreateButton("Destroy UI", function()
-    ScreenGui:Destroy()
+player.Chatted:Connect(function(msg)
+    if msg:sub(1, #prefix) == prefix then
+        runCommand(msg)
+    end
 end)
