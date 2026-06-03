@@ -1,70 +1,150 @@
 local Players = game:GetService("Players")
-local prefix = "!"
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 
+local LocalPlayer = Players.LocalPlayer
+local Prefix = ":"
+local Admins = {LocalPlayer.UserId} -- Add other UserIds here
+
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdminCommandBarGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local CommandBar = Instance.new("TextBox")
+CommandBar.Name = "CommandBar"
+CommandBar.Size = UDim2.new(0, 400, 0, 40)
+CommandBar.Position = UDim2.new(0.5, -200, 1, -100)
+CommandBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+CommandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+CommandBar.PlaceholderText = "Enter command here..."
+CommandBar.Font = Enum.Font.Code
+CommandBar.TextSize = 18
+CommandBar.Visible = false
+CommandBar.BorderSizePixel = 2
+CommandBar.Parent = ScreenGui
+
+-- Helper function to find players
 local function getPlayer(name)
     name = name:lower()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name:lower():sub(1, #name) == name then
-            return player
+    if name == "me" then return {LocalPlayer} end
+    if name == "all" then return Players:GetPlayers() end
+    if name == "others" then
+        local list = {}
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(list, p) end
+        end
+        return list
+    end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():sub(1, #name) == name then
+            return {p}
         end
     end
-    return nil
+    return {}
 end
 
-local function setMoney(player, amount)
-    local leaderstats = player:FindFirstChild("leaderstats")
-    if not leaderstats then return false end
+-- Command Logic
+local Commands = {}
 
-    local money = leaderstats:FindFirstChild("Money") or leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Coins")
-    if money and (money:IsA("IntValue") or money:IsA("NumberValue")) then
-        money.Value = amount
-        return true
-    end
-    return false
-end
-
-local commands = {}
-
-commands.money = function(sender, args)
-    local amount = tonumber(args[1])
-    if amount then
-        local success = setMoney(sender, amount)
-        if success then
-            print("Set " .. sender.Name .. "'s money to " .. amount)
+Commands.money = function(args)
+    local targetPlayers = getPlayer(args[1] or "me")
+    local amount = tonumber(args[2]) or 0
+    
+    for _, p in pairs(targetPlayers) do
+        -- Common leaderstat names
+        local stats = p:FindFirstChild("leaderstats")
+        if stats then
+            for _, stat in pairs(stats:GetChildren()) do
+                if stat:IsA("NumberValue") or stat:IsA("IntValue") then
+                    if stat.Name:lower():find("money") or stat.Name:lower():find("cash") or stat.Name:lower():find("coins") then
+                        stat.Value = amount
+                    end
+                end
+            end
         end
     end
 end
 
-commands.kill = function(sender, args)
-    local target = getPlayer(args[1] or "")
-    if target and target.Character then
-        target.Character:BreakJoints()
-    end
-end
-
-commands.speed = function(sender, args)
-    local target = getPlayer(args[1] or "")
+Commands.speed = function(args)
+    local targetPlayers = getPlayer(args[1] or "me")
     local speed = tonumber(args[2]) or 16
-    if target and target.Character and target.Character:FindFirstChild("Humanoid") then
-        target.Character.Humanoid.WalkSpeed = speed
+    for _, p in pairs(targetPlayers) do
+        if p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.WalkSpeed = speed
+        end
     end
 end
 
-Players.PlayerAdded:Connect(function(player)
-    player.Chatted:Connect(function(message)
-        if message:sub(1, 1) == prefix then
-            local fullCommand = message:sub(2)
-            local split = fullCommand:split(" ")
-            local commandName = split[1]:lower()
-            local args = {}
-
-            for i = 2, #split do
-                table.insert(args, split[i])
-            end
-
-            if commands[commandName] then
-                commands[commandName](player, args)
-            end
+Commands.jump = function(args)
+    local targetPlayers = getPlayer(args[1] or "me")
+    local power = tonumber(args[2]) or 50
+    for _, p in pairs(targetPlayers) do
+        if p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.JumpPower = power
         end
-    end)
+    end
+end
+
+Commands.kill = function(args)
+    local targetPlayers = getPlayer(args[1])
+    for _, p in pairs(targetPlayers) do
+        if p.Character and p.Character:FindFirstChild("Humanoid") then
+            p.Character.Humanoid.Health = 0
+        end
+    end
+end
+
+-- Execution Logic
+local function executeCommand(input)
+    local split = input:split(" ")
+    local cmdName = split[1]:lower()
+    local args = {}
+    for i = 2, #split do
+        table.insert(args, split[i])
+    end
+
+    if Commands[cmdName] then
+        local success, err = pcall(function()
+            Commands[cmdName](args)
+        end)
+        if not success then
+            warn("Command Error: " .. err)
+        end
+    end
+end
+
+-- Input Handling
+CommandBar.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        executeCommand(CommandBar.Text)
+    end
+    CommandBar.Visible = false
+    CommandBar.Text = ""
 end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- "Strg" is Ctrl. Using LeftControl or RightControl
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        CommandBar.Visible = not CommandBar.Visible
+        if CommandBar.Visible then
+            CommandBar:CaptureFocus()
+            -- Small delay to prevent the key press from typing into the box
+            task.wait()
+            CommandBar.Text = ""
+        end
+    end
+end)
+
+-- Chat listener for standard prefix commands
+LocalPlayer.Chatted:Connect(function(msg)
+    if msg:sub(1, 1) == Prefix then
+        executeCommand(msg:sub(2))
+    end
+end)
+
+print("Admin System Loaded. Press Ctrl to open Command Bar.")
