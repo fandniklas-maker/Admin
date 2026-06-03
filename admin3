@@ -1,0 +1,54 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Assuming the executor player is the local player
+local executor = Players.LocalPlayer
+
+-- Function to steal the brainrot panel
+local function stealBrainrotPanel()
+    -- Assuming the brainrot panel is a GUI in ReplicatedStorage
+    local brainrotPanel = ReplicatedStorage:FindFirstChild("BrainrotPanel")
+    if brainrotPanel then
+        -- Clone the panel to the executor's PlayerGui
+        local clonedPanel = brainrotPanel:Clone()
+        clonedPanel.Parent = executor:WaitForChild("PlayerGui")
+        print("Brainrot Panel spawned for executor.")
+    else
+        warn("BrainrotPanel not found in ReplicatedStorage.")
+    end
+end
+
+-- Function to announce the stealing
+local function announceSteal()
+    local message = executor.Name .. " has stolen the Brainrot Panel!"
+    -- Assuming there is a RemoteEvent for announcements
+    local announcementEvent = ReplicatedStorage:FindFirstChild("AnnouncementEvent")
+    if announcementEvent and announcementEvent:IsA("RemoteEvent") then
+        announcementEvent:FireAllClients(message)
+    else
+        -- Fallback: print to output
+        print(message)
+    end
+end
+
+-- Function to set money for executor
+local function setMoney(amount)
+    -- Assuming the executor has a leaderstats folder with a Money IntValue
+    local leaderstats = executor:FindFirstChild("leaderstats")
+    if leaderstats then
+        local money = leaderstats:FindFirstChild("Money")
+        if money and money:IsA("IntValue") then
+            money.Value = amount
+            print("Executor's money set to " .. amount)
+        else
+            warn("Money IntValue not found in leaderstats.")
+        end
+    else
+        warn("leaderstats not found for executor.")
+    end
+end
+
+-- Execute the functions
+stealBrainrotPanel()
+announceSteal()
+setMoney(10000) -- Set money to 10,000 for example
