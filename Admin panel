@@ -1,186 +1,174 @@
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local UIS = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 
-local LocalPlayer = Players.LocalPlayer
-local Prefix = "/"
-local AdminName = "Custom Admin"
+local player = Players.LocalPlayer
+local prefix = "/"
+local commandBarActive = false
 
--- UI Setup
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AdminGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
-
-local CommandBar = Instance.new("TextBox")
-CommandBar.Name = "CommandBar"
-CommandBar.Size = UDim2.new(0, 400, 0, 40)
-CommandBar.Position = UDim2.new(0.5, -200, 1, -100)
-CommandBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-CommandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
-CommandBar.PlaceholderText = "Command hier eingeben..."
-CommandBar.Visible = false
-CommandBar.BorderSizePixel = 0
-CommandBar.Font = Enum.Font.SourceSans
-CommandBar.TextSize = 20
-CommandBar.Parent = ScreenGui
-
-local MenuFrame = Instance.new("ScrollingFrame")
-MenuFrame.Name = "CommandMenu"
-MenuFrame.Size = UDim2.new(0, 300, 0, 400)
-MenuFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MenuFrame.Visible = false
-MenuFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
-MenuFrame.Parent = ScreenGui
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Parent = MenuFrame
-UIListLayout.Padding = UDim.new(0, 5)
-
--- Notification
+-- Notification on Load
 StarterGui:SetCore("SendNotification", {
-    Title = AdminName,
+    Title = "Admin System",
     Text = "admin erfolgreich geladen",
     Duration = 5
 })
 
--- Functions
-local function GetPlayer(name)
-    name = name:lower()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p.Name:lower():sub(1, #name) == name or p.DisplayName:lower():sub(1, #name) == name then
-            return p
-        end
-    end
-    return nil
-end
+-- UI Creation
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AdminSystemUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local function FindCurrency(player)
-    local stats = player:FindFirstChild("leaderstats") or player:FindFirstChild("Data")
+-- Command Bar
+local cmdBar = Instance.new("TextBox")
+cmdBar.Name = "CommandBar"
+cmdBar.Parent = screenGui
+cmdBar.Size = UDim2.new(0, 400, 0, 40)
+cmdBar.Position = UDim2.new(0.5, -200, 0, -50) -- Hidden initially
+cmdBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+cmdBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+cmdBar.PlaceholderText = "Enter Command here..."
+cmdBar.Font = Enum.Font.Code
+cmdBar.TextSize = 18
+cmdBar.BorderSizePixel = 2
+cmdBar.Visible = false
+
+-- Help Menu
+local helpMenu = Instance.new("Frame")
+helpMenu.Name = "HelpMenu"
+helpMenu.Parent = screenGui
+helpMenu.Size = UDim2.new(0, 300, 0, 400)
+helpMenu.Position = UDim2.new(0.5, -150, 0.5, -200)
+helpMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+helpMenu.Visible = false
+
+local helpTitle = Instance.new("TextLabel")
+helpTitle.Parent = helpMenu
+helpTitle.Size = UDim2.new(1, 0, 0, 30)
+helpTitle.Text = "Commands List"
+helpTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+helpTitle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+local helpList = Instance.new("ScrollingFrame")
+helpList.Parent = helpMenu
+helpList.Position = UDim2.new(0, 0, 0, 30)
+helpList.Size = UDim2.new(1, 0, 1, -30)
+helpList.CanvasSize = UDim2.new(0, 0, 2, 0)
+helpList.ScrollBarThickness = 5
+
+local helpText = Instance.new("TextLabel")
+helpText.Parent = helpList
+helpText.Size = UDim2.new(1, -10, 1, 0)
+helpText.Position = UDim2.new(0, 5, 0, 5)
+helpText.BackgroundTransparency = 1
+helpText.TextColor3 = Color3.fromRGB(200, 200, 200)
+helpText.TextXAlignment = Enum.TextXAlignment.Left
+helpText.TextYAlignment = Enum.TextYAlignment.Top
+helpText.Font = Enum.Font.SourceSans
+helpText.TextSize = 16
+helpText.Text = [[
+/speed [num] - Set WalkSpeed
+/ws [num] - Set WalkSpeed
+/jumppower [num] - Set JumpPower
+/jp [num] - Set JumpPower
+/money [num] - Try to set Money
+/cash [num] - Try to set Cash
+/geld [num] - Try to set Geld
+/fly - Toggle Fly
+/noclip - Toggle NoClip
+/cmds - Show this menu
+/re - Reset Character
+/exit - Close Menu
+]]
+
+-- Logic Functions
+local flying = false
+local noclip = false
+
+local function setMoney(amount)
+    local stats = player:FindFirstChild("leaderstats")
     if stats then
-        for _, v in pairs(stats:GetChildren()) do
-            local n = v.Name:lower()
-            if n:find("money") or n:find("geld") or n:find("cash") or n:find("coins") or n:find("points") then
-                return v
+        for _, val in pairs(stats:GetChildren()) do
+            local name = val.Name:lower()
+            if name == "money" or name == "cash" or name == "geld" or name == "coins" or name == "currency" then
+                val.Value = amount
             end
         end
     end
-    return nil
 end
 
-local Commands = {}
+local function runCommand(input)
+    local args = string.split(input, " ")
+    local cmd = args[1]:lower()
 
-Commands["speed"] = function(args)
-    local power = tonumber(args[1]) or 16
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = power
-    end
-end
-
-Commands["jump"] = function(args)
-    local power = tonumber(args[1]) or 50
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.JumpPower = power
-        LocalPlayer.Character.Humanoid.UseJumpPower = true
-    end
-end
-
-Commands["money"] = function(args)
-    local amount = tonumber(args[1]) or 999999
-    local currency = FindCurrency(LocalPlayer)
-    if currency then
-        currency.Value = amount
-    end
-end
-Commands["geld"] = Commands["money"]
-Commands["cash"] = Commands["money"]
-
-Commands["cmds"] = function()
-    MenuFrame.Visible = not MenuFrame.Visible
-end
-
-Commands["kill"] = function(args)
-    local target = GetPlayer(args[1])
-    if target and target.Character then
-        target.Character:BreakJoints()
-    end
-end
-
-Commands["tp"] = function(args)
-    local target = GetPlayer(args[1])
-    if target and target.Character and LocalPlayer.Character then
-        LocalPlayer.Character:MoveTo(target.Character.PrimaryPart.Position)
-    end
-end
-
-Commands["fly"] = function()
-    local c = LocalPlayer.Character
-    if not c then return end
-    local h = c:FindFirstChild("Humanoid")
-    local root = c:FindFirstChild("HumanoidRootPart")
-    if not h or not root then return end
-    
-    local bv = Instance.new("BodyVelocity", root)
-    bv.MaxForce = Vector3.new(1,1,1) * math.huge
-    bv.Velocity = Vector3.new(0,0,0)
-    
-    local bg = Instance.new("BodyGyro", root)
-    bg.MaxTorque = Vector3.new(1,1,1) * math.huge
-    bg.P = 10000
-    bg.D = 50
-    
-    RunService.RenderStepped:Connect(function()
-        if bv.Parent then
-            bv.Velocity = h.MoveDirection * 50
-            bg.CFrame = workspace.CurrentCamera.CFrame
+    if cmd == "/speed" or cmd == "/ws" then
+        local power = tonumber(args[2]) or 16
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = power
         end
-    end)
+    elseif cmd == "/jumppower" or cmd == "/jp" then
+        local power = tonumber(args[2]) or 50
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.UseJumpPower = true
+            player.Character.Humanoid.JumpPower = power
+        end
+    elseif cmd == "/money" or cmd == "/cash" or cmd == "/geld" then
+        local amount = tonumber(args[2]) or 999999
+        setMoney(amount)
+    elseif cmd == "/cmds" then
+        helpMenu.Visible = not helpMenu.Visible
+    elseif cmd == "/re" then
+        if player.Character then player.Character:BreakJoints() end
+    elseif cmd == "/exit" then
+        helpMenu.Visible = false
+    elseif cmd == "/noclip" then
+        noclip = not noclip
+    end
 end
 
--- Command execution logic
-local function ExecuteCommand(input)
-    if input:sub(1, #Prefix) == Prefix then
-        input = input:sub(#Prefix + 1)
-    end
+-- Input Handling
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
     
-    local args = input:split(" ")
-    local cmdName = table.remove(args, 1):lower()
-    
-    if Commands[cmdName] then
-        Commands[cmdName](args)
-    end
-end
-
--- Input handling
-UserInputService.InputBegan:Connect(function(input, processed)
-    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
-        CommandBar.Visible = true
-        CommandBar:CaptureFocus()
+    -- Toggle Command Bar with Left Control (Strg)
+    if input.KeyCode == Enum.KeyCode.LeftControl then
+        commandBarActive = not commandBarActive
+        cmdBar.Visible = commandBarActive
+        if commandBarActive then
+            cmdBar:CaptureFocus()
+            cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, 50), "Out", "Quad", 0.3, true)
+        else
+            cmdBar:ReleaseFocus()
+            cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, -50), "In", "Quad", 0.3, true)
+        end
     end
 end)
 
-CommandBar.FocusLost:Connect(function(enterPressed)
+cmdBar.FocusLost:Connect(function(enterPressed)
     if enterPressed then
-        ExecuteCommand(CommandBar.Text)
+        runCommand(cmdBar.Text)
     end
-    CommandBar.Text = ""
-    CommandBar.Visible = false
+    cmdBar.Text = ""
+    commandBarActive = false
+    cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, -50), "In", "Quad", 0.3, true, function()
+        cmdBar.Visible = false
+    end)
 end)
 
-LocalPlayer.Chatted:Connect(function(msg)
-    if msg:sub(1, #Prefix) == Prefix then
-        ExecuteCommand(msg)
+player.Chatted:Connect(function(msg)
+    if msg:sub(1,1) == prefix then
+        runCommand(msg)
     end
 end)
 
--- Fill Menu UI
-for cmd, _ in pairs(Commands) do
-    local btn = Instance.new("TextLabel")
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Text = Prefix .. cmd
-    btn.Parent = MenuFrame
-end
+-- NoClip Loop
+RunService.Stepped:Connect(function()
+    if noclip and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
