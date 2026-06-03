@@ -1,0 +1,70 @@
+local Players = game:GetService("Players")
+local prefix = "!"
+
+local function getPlayer(name)
+    name = name:lower()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():sub(1, #name) == name then
+            return player
+        end
+    end
+    return nil
+end
+
+local function setMoney(player, amount)
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if not leaderstats then return false end
+
+    local money = leaderstats:FindFirstChild("Money") or leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Coins")
+    if money and (money:IsA("IntValue") or money:IsA("NumberValue")) then
+        money.Value = amount
+        return true
+    end
+    return false
+end
+
+local commands = {}
+
+commands.money = function(sender, args)
+    local amount = tonumber(args[1])
+    if amount then
+        local success = setMoney(sender, amount)
+        if success then
+            print("Set " .. sender.Name .. "'s money to " .. amount)
+        end
+    end
+end
+
+commands.kill = function(sender, args)
+    local target = getPlayer(args[1] or "")
+    if target and target.Character then
+        target.Character:BreakJoints()
+    end
+end
+
+commands.speed = function(sender, args)
+    local target = getPlayer(args[1] or "")
+    local speed = tonumber(args[2]) or 16
+    if target and target.Character and target.Character:FindFirstChild("Humanoid") then
+        target.Character.Humanoid.WalkSpeed = speed
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.Chatted:Connect(function(message)
+        if message:sub(1, 1) == prefix then
+            local fullCommand = message:sub(2)
+            local split = fullCommand:split(" ")
+            local commandName = split[1]:lower()
+            local args = {}
+
+            for i = 2, #split do
+                table.insert(args, split[i])
+            end
+
+            if commands[commandName] then
+                commands[commandName](player, args)
+            end
+        end
+    end)
+end)
