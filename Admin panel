@@ -1,98 +1,65 @@
-local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
-local prefix = "/"
-local isFlying = false
+-- State Variables
+local flying = false
 local flySpeed = 50
-local cmdBarActive = false
+local speedMultiplier = 16
+local jumpPower = 50
+local commandBarActive = false
 
--- UI Setup
+-- UI Setup (Command Bar)
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaAdminGui"
+screenGui.Name = "AdminCommandBar"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = game:GetService("CoreGui")
 
--- Loading Notification
-local function showNotification(text)
-    local notification = Instance.new("TextLabel")
-    notification.Size = UDim2.new(0, 300, 0, 50)
-    notification.Position = UDim2.new(0.5, -150, 0.4, -25)
-    notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    notification.TextColor3 = Color3.fromRGB(255, 255, 255)
-    notification.Text = text
-    notification.Font = Enum.Font.Offset
-    notification.TextSize = 20
-    notification.BackgroundTransparency = 0.5
-    notification.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = notification
-
-    task.wait(2)
-    TweenService:Create(notification, TweenInfo.new(1), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
-    task.wait(1)
-    notification:Destroy()
-end
-
--- Command Bar UI
-local cmdBarFrame = Instance.new("Frame")
-cmdBarFrame.Size = UDim2.new(0, 400, 0, 40)
-cmdBarFrame.Position = UDim2.new(0.5, -200, 0.9, -20)
-cmdBarFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-cmdBarFrame.BorderSizePixel = 0
-cmdBarFrame.Visible = false
-cmdBarFrame.Parent = screenGui
-
-local cmdInput = Instance.new("TextBox")
-cmdInput.Size = UDim2.new(1, -20, 1, 0)
-cmdInput.Position = UDim2.new(0, 10, 0, 0)
-cmdInput.BackgroundTransparency = 1
-cmdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-cmdInput.Text = ""
-cmdInput.PlaceholderText = "Enter command (prefix: " .. prefix .. ")"
-cmdInput.Font = Enum.Font.Code
-cmdInput.TextSize = 18
-cmdInput.TextXAlignment = Enum.TextXAlignment.Left
-cmdInput.Parent = cmdBarFrame
+local commandBar = Instance.new("TextBox")
+commandBar.Size = UDim2.new(0, 400, 0, 40)
+commandBar.Position = UDim2.new(0.5, -200, 0.8, 0)
+commandBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+commandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+commandBar.PlaceholderText = "Enter Command (fly, speed [val], jump [val])..."
+commandBar.Visible = false
+commandBar.Parent = screenGui
 
 -- Fly Logic
 local bodyGyro, bodyVelocity
 local function toggleFly()
-    isFlying = not isFlying
-    character = player.Character
-    humanoid = character:FindFirstChildOfClass("Humanoid")
-    
-    if isFlying then
+    flying = not flying
+    if flying then
+        character = player.Character
+        local root = character:WaitForChild("HumanoidRootPart")
+        
         bodyGyro = Instance.new("BodyGyro")
         bodyGyro.P = 9e4
         bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bodyGyro.cframe = character.PrimaryPart.CFrame
-        bodyGyro.Parent = character.PrimaryPart
-
+        bodyGyro.cframe = root.CFrame
+        bodyGyro.Parent = root
+        
         bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+        bodyVelocity.velocity = Vector3.new(0, 0, 0)
         bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
-        bodyVelocity.Parent = character.PrimaryPart
+        bodyVelocity.Parent = root
         
         humanoid.PlatformStand = true
         
-        spawn(function()
-            while isFlying do
+        task.spawn(function()
+            while flying do
                 local camera = workspace.CurrentCamera
-                local moveDir = Vector3.new(0,0,0)
+                local moveDir = humanoid.MoveDirection
                 
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+                if moveDir.Magnitude > 0 then
+                    bodyVelocity.velocity = camera.CFrame.LookVector * flySpeed
+                else
+                    bodyVelocity.velocity = Vector3.new(0, 0, 0)
+                end
                 
-                bodyVelocity.velocity = moveDir * flySpeed
                 bodyGyro.cframe = camera.CFrame
                 RunService.RenderStepped:Wait()
             end
@@ -104,12 +71,11 @@ local function toggleFly()
     end
 end
 
--- Command Execution
+-- Command Processor
 local function executeCommand(input)
-    if not input:find(prefix) == 1 then return end
-    local args = input:sub(#prefix + 1):split(" ")
-    local cmd = args[1]:lower()
-
+    local args = string.split(string.lower(input), " ")
+    local cmd = args[1]
+    
     if cmd == "fly" then
         toggleFly()
     elseif cmd == "speed" then
@@ -124,25 +90,32 @@ end
 
 -- Input Handling
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
-        cmdBarActive = not cmdBarActive
-        cmdBarFrame.Visible = cmdBarActive
-        if cmdBarActive then
-            cmdInput:CaptureFocus()
+    if gameProcessed then return end
+    
+    -- Open Command Bar with Right Control
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        commandBarActive = not commandBarActive
+        commandBar.Visible = commandBarActive
+        if commandBarActive then
+            commandBar:CaptureFocus()
         else
-            cmdInput:ReleaseFocus()
+            commandBar:ReleaseFocus()
         end
     end
 end)
 
-cmdInput.FocusLost:Connect(function(enterPressed)
+commandBar.FocusLost:Connect(function(enterPressed)
     if enterPressed then
-        executeCommand(cmdInput.Text)
+        executeCommand(commandBar.Text)
+        commandBar.Text = ""
     end
-    cmdInput.Text = ""
-    cmdBarFrame.Visible = false
-    cmdBarActive = false
+    commandBar.Visible = false
+    commandBarActive = false
 end)
 
--- Initialize
-showNotification("Delta Admin Loaded Successfully")
+-- Update character reference on respawn
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    flying = false
+end)
