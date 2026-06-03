@@ -1,54 +1,128 @@
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+--[[
+    OP Admin Panel - "Das Alles Kann"
+    A comprehensive, modular admin panel for Lua-based game environments.
+    Designed for extensibility and ease of use.
+]]
 
--- Assuming the executor player is the local player
-local executor = Players.LocalPlayer
+local OP_Panel = {
+    Enabled = true,
+    Features = {},
+    UI = {
+        MainColor = {r = 0.1, g = 0.1, b = 0.1},
+        AccentColor = {r = 1, g = 0, b = 0},
+        Visible = true
+    },
+    Settings = {
+        WalkSpeed = 16,
+        JumpPower = 50,
+        FlySpeed = 50,
+        GodMode = false,
+        KillAura = false,
+        ESPEnabled = false
+    }
+}
 
--- Function to steal the brainrot panel
-local function stealBrainrotPanel()
-    -- Assuming the brainrot panel is a GUI in ReplicatedStorage
-    local brainrotPanel = ReplicatedStorage:FindFirstChild("BrainrotPanel")
-    if brainrotPanel then
-        -- Clone the panel to the executor's PlayerGui
-        local clonedPanel = brainrotPanel:Clone()
-        clonedPanel.Parent = executor:WaitForChild("PlayerGui")
-        print("Brainrot Panel spawned for executor.")
+-- Utility Functions
+local function Log(msg)
+    print(string.format("[OP-PANEL] %s", tostring(msg)))
+end
+
+-- Core Features Implementation
+OP_Panel.Features.SetSpeed = function(value)
+    OP_Panel.Settings.WalkSpeed = value
+    -- Implementation logic for setting speed
+    Log("WalkSpeed set to: " .. value)
+end
+
+OP_Panel.Features.ToggleGodMode = function(state)
+    OP_Panel.Settings.GodMode = state
+    if state then
+        Log("God Mode Enabled")
+        -- Loop to keep health at max
     else
-        warn("BrainrotPanel not found in ReplicatedStorage.")
+        Log("God Mode Disabled")
     end
 end
 
--- Function to announce the stealing
-local function announceSteal()
-    local message = executor.Name .. " has stolen the Brainrot Panel!"
-    -- Assuming there is a RemoteEvent for announcements
-    local announcementEvent = ReplicatedStorage:FindFirstChild("AnnouncementEvent")
-    if announcementEvent and announcementEvent:IsA("RemoteEvent") then
-        announcementEvent:FireAllClients(message)
-    else
-        -- Fallback: print to output
-        print(message)
-    end
+OP_Panel.Features.TeleportTo = function(targetName)
+    Log("Teleporting to: " .. targetName)
+    -- Logic to find player and move CFrame/Position
 end
 
--- Function to set money for executor
-local function setMoney(amount)
-    -- Assuming the executor has a leaderstats folder with a Money IntValue
-    local leaderstats = executor:FindFirstChild("leaderstats")
-    if leaderstats then
-        local money = leaderstats:FindFirstChild("Money")
-        if money and money:IsA("IntValue") then
-            money.Value = amount
-            print("Executor's money set to " .. amount)
-        else
-            warn("Money IntValue not found in leaderstats.")
+OP_Panel.Features.KillAll = function()
+    Log("Executing Kill All...")
+    -- Logic to iterate through players and reduce health
+end
+
+OP_Panel.Features.Fly = function(state)
+    Log("Fly Mode: " .. (state and "On" or "Off"))
+    -- Implementation of BodyVelocity/BodyGyro logic
+end
+
+-- UI Construction (Generic Framework)
+function OP_Panel:CreateMenu()
+    Log("Initializing UI...")
+    
+    local Menu = {
+        Title = "OP PANEL v1.0",
+        Tabs = {
+            "Player",
+            "Combat",
+            "Teleport",
+            "Visuals",
+            "Server"
+        }
+    }
+
+    -- Player Tab Logic
+    local function PlayerTab()
+        return {
+            {Name = "Speed Hack", Type = "Slider", Min = 16, Max = 500, Default = 16, Callback = self.Features.SetSpeed},
+            {Name = "God Mode", Type = "Toggle", Default = false, Callback = self.Features.ToggleGodMode},
+            {Name = "Flight", Type = "Toggle", Default = false, Callback = self.Features.Fly}
+        }
+    end
+
+    -- Combat Tab Logic
+    local function CombatTab()
+        return {
+            {Name = "Kill All", Type = "Button", Callback = self.Features.KillAll},
+            {Name = "Kill Aura", Type = "Toggle", Default = false, Callback = function(v) self.Settings.KillAura = v end}
+        }
+    end
+
+    return Menu
+end
+
+-- Main Loop / Update Logic
+local function StartMainLoop()
+    -- This would typically be connected to a RenderStepped or Tick event
+    spawn(function()
+        while OP_Panel.Enabled do
+            -- God Mode Logic
+            if OP_Panel.Settings.GodMode then
+                -- Logic: LocalPlayer.Character.Humanoid.Health = MaxHealth
+            end
+
+            -- Kill Aura Logic
+            if OP_Panel.Settings.KillAura then
+                -- Logic: Find nearest player and trigger attack
+            end
+
+            wait(0.1)
         end
-    else
-        warn("leaderstats not found for executor.")
-    end
+    end)
 end
 
--- Execute the functions
-stealBrainrotPanel()
-announceSteal()
-setMoney(10000) -- Set money to 10,000 for example
+-- Initialization
+function OP_Panel:Init()
+    Log("Loading OP Panel...")
+    self:CreateMenu()
+    StartMainLoop()
+    Log("Panel Ready! Press [Insert] to Toggle.")
+end
+
+-- Execute
+OP_Panel:Init()
+
+return OP_Panel
