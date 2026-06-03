@@ -1,128 +1,184 @@
---[[
-    OP Admin Panel - "Das Alles Kann"
-    A comprehensive, modular admin panel for Lua-based game environments.
-    Designed for extensibility and ease of use.
-]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local OP_Panel = {
-    Enabled = true,
-    Features = {},
-    UI = {
-        MainColor = {r = 0.1, g = 0.1, b = 0.1},
-        AccentColor = {r = 1, g = 0, b = 0},
-        Visible = true
-    },
-    Settings = {
-        WalkSpeed = 16,
-        JumpPower = 50,
-        FlySpeed = 50,
-        GodMode = false,
-        KillAura = false,
-        ESPEnabled = false
-    }
-}
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local Content = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
 
--- Utility Functions
-local function Log(msg)
-    print(string.format("[OP-PANEL] %s", tostring(msg)))
-end
+ScreenGui.Name = "OP_Panel"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
 
--- Core Features Implementation
-OP_Panel.Features.SetSpeed = function(value)
-    OP_Panel.Settings.WalkSpeed = value
-    -- Implementation logic for setting speed
-    Log("WalkSpeed set to: " .. value)
-end
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 200, 0, 300)
+MainFrame.Active = true
+MainFrame.Draggable = true
 
-OP_Panel.Features.ToggleGodMode = function(state)
-    OP_Panel.Settings.GodMode = state
-    if state then
-        Log("God Mode Enabled")
-        -- Loop to keep health at max
-    else
-        Log("God Mode Disabled")
-    end
-end
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "OP PANEL"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
 
-OP_Panel.Features.TeleportTo = function(targetName)
-    Log("Teleporting to: " .. targetName)
-    -- Logic to find player and move CFrame/Position
-end
+Content.Name = "Content"
+Content.Parent = MainFrame
+Content.Active = true
+Content.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.Position = UDim2.new(0, 5, 0, 35)
+Content.Size = UDim2.new(1, -10, 1, -40)
+Content.CanvasSize = UDim2.new(0, 0, 0, 400)
+Content.ScrollBarThickness = 4
 
-OP_Panel.Features.KillAll = function()
-    Log("Executing Kill All...")
-    -- Logic to iterate through players and reduce health
-end
+UIListLayout.Parent = Content
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
 
-OP_Panel.Features.Fly = function(state)
-    Log("Fly Mode: " .. (state and "On" or "Off"))
-    -- Implementation of BodyVelocity/BodyGyro logic
-end
-
--- UI Construction (Generic Framework)
-function OP_Panel:CreateMenu()
-    Log("Initializing UI...")
+local function createButton(text, callback)
+    local Button = Instance.new("TextButton")
+    Button.Parent = Content
+    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Button.BorderSizePixel = 0
+    Button.Size = UDim2.new(1, 0, 0, 30)
+    Button.Font = Enum.Font.SourceSans
+    Button.Text = text
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 14
     
-    local Menu = {
-        Title = "OP PANEL v1.0",
-        Tabs = {
-            "Player",
-            "Combat",
-            "Teleport",
-            "Visuals",
-            "Server"
-        }
-    }
-
-    -- Player Tab Logic
-    local function PlayerTab()
-        return {
-            {Name = "Speed Hack", Type = "Slider", Min = 16, Max = 500, Default = 16, Callback = self.Features.SetSpeed},
-            {Name = "God Mode", Type = "Toggle", Default = false, Callback = self.Features.ToggleGodMode},
-            {Name = "Flight", Type = "Toggle", Default = false, Callback = self.Features.Fly}
-        }
-    end
-
-    -- Combat Tab Logic
-    local function CombatTab()
-        return {
-            {Name = "Kill All", Type = "Button", Callback = self.Features.KillAll},
-            {Name = "Kill Aura", Type = "Toggle", Default = false, Callback = function(v) self.Settings.KillAura = v end}
-        }
-    end
-
-    return Menu
+    Button.MouseButton1Click:Connect(callback)
+    return Button
 end
 
--- Main Loop / Update Logic
-local function StartMainLoop()
-    -- This would typically be connected to a RenderStepped or Tick event
-    spawn(function()
-        while OP_Panel.Enabled do
-            -- God Mode Logic
-            if OP_Panel.Settings.GodMode then
-                -- Logic: LocalPlayer.Character.Humanoid.Health = MaxHealth
-            end
+-- Features Logic
+local noclip = false
+local fly = false
+local infJump = false
 
-            -- Kill Aura Logic
-            if OP_Panel.Settings.KillAura then
-                -- Logic: Find nearest player and trigger attack
-            end
+-- Speed
+createButton("Speed (50)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 50
+    end
+end)
 
-            wait(0.1)
+-- Jump
+createButton("Jump (100)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.JumpPower = 100
+    end
+end)
+
+-- Noclip
+createButton("Toggle Noclip", function()
+    noclip = not noclip
+    if noclip then
+        print("Noclip Enabled")
+    else
+        print("Noclip Disabled")
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
         end
-    end)
-end
+    end
+end)
 
--- Initialization
-function OP_Panel:Init()
-    Log("Loading OP Panel...")
-    self:CreateMenu()
-    StartMainLoop()
-    Log("Panel Ready! Press [Insert] to Toggle.")
-end
+-- Fly
+createButton("Toggle Fly", function()
+    fly = not fly
+    local char = LocalPlayer.Character
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    
+    if fly and root then
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "FlyVelocity"
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Parent = root
+        
+        task.spawn(function()
+            while fly do
+                local cam = workspace.CurrentCamera
+                local moveDir = Vector3.new(0,0,0)
+                
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                
+                bv.Velocity = moveDir * 50
+                task.wait()
+            end
+            bv:Destroy()
+        end)
+    end
+end)
 
--- Execute
-OP_Panel:Init()
+-- Infinite Jump
+createButton("Toggle Inf Jump", function()
+    infJump = not infJump
+end)
 
-return OP_Panel
+UserInputService.JumpRequest:Connect(function()
+    if infJump then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+-- ESP
+createButton("Simple ESP", function()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local highlight = Instance.new("Highlight")
+            highlight.Parent = player.Character
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        end
+    end
+end)
+
+-- Fullbright
+createButton("Fullbright", function()
+    game:GetService("Lighting").Brightness = 2
+    game:GetService("Lighting").ClockTime = 14
+    game:GetService("Lighting").FogEnd = 100000
+    game:GetService("Lighting").GlobalShadows = false
+end)
+
+-- Reset
+createButton("Reset Character", function()
+    if LocalPlayer.Character then
+        LocalPlayer.Character:BreakJoints()
+    end
+end)
+
+-- Close Button
+local Close = Instance.new("TextButton")
+Close.Parent = MainFrame
+Close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+Close.Position = UDim2.new(1, -25, 0, 5)
+Close.Size = UDim2.new(0, 20, 0, 20)
+Close.Text = "X"
+Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+Close.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
