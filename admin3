@@ -1,38 +1,54 @@
-local Rayfield = loadstring(game:HttpGet("raw.githubusercontent.com/fandniklas-maker/Admin/refs/heads/main/admin3"))();
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "OP Multi-Tool | Executor Edition",
-   LoadingTitle = "Loading OP GUI...",
-   LoadingSubtitle = "by Helpful AI Assistant",
+   Name = "OP Executor Hub | Universal",
+   LoadingTitle = "Loading Ultimate Suite...",
+   LoadingSubtitle = "by Helpful AI",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "OP_Gui_Config",
-      FileName = "MainConfig"
+      FolderName = "OP_Hub_Config",
+      FileName = "UniversalConfig"
    },
    KeySystem = false
 })
 
 -- Variables
-local Player = game.Players.LocalPlayer
+local Player = game:GetService("Players").LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 
-local Flying = false
-local SpeedValue = 16
-local JumpValue = 50
-local GravityValue = 196.2
-local NoclipEnabled = false
+local ESPEnabled = false
+local TracersEnabled = false
+local FlyEnabled = false
+local FlySpeed = 50
 
 -- Tabs
-local MainTab = Window:CreateTab("Player", 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483362458)
+local ScriptsTab = Window:CreateTab("Scripts", 4483362458)
+
+-- Main Tab
+MainTab:CreateSection("Universal Utilities")
+
+MainTab:CreateButton({
+   Name = "Infinite Yield",
+   Callback = function()
+       loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "Dex Explorer",
+   Callback = function()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+   end,
+})
 
 -- Player Tab
-MainTab:CreateSection("Movement")
+PlayerTab:CreateSection("Movement")
 
-MainTab:CreateSlider({
+PlayerTab:CreateSlider({
    Name = "WalkSpeed",
    Range = {16, 500},
    Increment = 1,
@@ -40,12 +56,11 @@ MainTab:CreateSlider({
    CurrentValue = 16,
    Flag = "WS_Slider",
    Callback = function(Value)
-      SpeedValue = Value
-      Humanoid.WalkSpeed = Value
+       Humanoid.WalkSpeed = Value
    end,
 })
 
-MainTab:CreateSlider({
+PlayerTab:CreateSlider({
    Name = "JumpPower",
    Range = {50, 500},
    Increment = 1,
@@ -53,174 +68,82 @@ MainTab:CreateSlider({
    CurrentValue = 50,
    Flag = "JP_Slider",
    Callback = function(Value)
-      JumpValue = Value
-      Humanoid.JumpPower = Value
+       Humanoid.UseJumpPower = true
+       Humanoid.JumpPower = Value
    end,
 })
 
-MainTab:CreateSlider({
-   Name = "Gravity",
-   Range = {0, 196.2},
-   Increment = 1,
-   Suffix = "G",
-   CurrentValue = 196.2,
-   Flag = "Grav_Slider",
-   Callback = function(Value)
-      workspace.Gravity = Value
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Noclip",
+PlayerTab:CreateToggle({
+   Name = "Fly",
    CurrentValue = false,
-   Flag = "Noclip_Toggle",
+   Flag = "Fly_Toggle",
    Callback = function(Value)
-      NoclipEnabled = Value
-      game:GetService("RunService").Stepped:Connect(function()
-         if NoclipEnabled then
-            for _, part in pairs(Character:GetDescendants()) do
-               if part:IsA("BasePart") then
-                  part.CanCollide = false
+       FlyEnabled = Value
+       if FlyEnabled then
+           local BodyGyro = Instance.new("BodyGyro", Character.PrimaryPart)
+           local BodyVelocity = Instance.new("BodyVelocity", Character.PrimaryPart)
+           BodyGyro.P = 9e4
+           BodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+           BodyGyro.cframe = Character.PrimaryPart.CFrame
+           BodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+           BodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+           
+           task.spawn(function()
+               while FlyEnabled do
+                   local Camera = workspace.CurrentCamera
+                   BodyVelocity.velocity = ((Camera.CFrame.LookVector * (FlySpeed)) + (Camera.CFrame.RightVector * 0))
+                   BodyGyro.cframe = Camera.CFrame
+                   task.wait()
                end
-            end
-         end
-      end)
-   end,
-})
-
-MainTab:CreateButton({
-   Name = "Fly (Press E)",
-   Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.lua"))()
+               BodyGyro:Destroy()
+               BodyVelocity:Destroy()
+           end)
+       end
    end,
 })
 
 -- Visuals Tab
 VisualsTab:CreateSection("ESP")
 
-VisualsTab:CreateButton({
-   Name = "Enable ESP (Boxes & Tracers)",
-   Callback = function()
-      -- Simple ESP Implementation
-      local function CreateESP(plr)
-         local Box = Drawing.new("Square")
-         Box.Visible = false
-         Box.Color = Color3.new(1, 0, 0)
-         Box.Thickness = 1
-         Box.Transparency = 1
-         Box.Filled = false
-
-         game:GetService("RunService").RenderStepped:Connect(function()
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-               local RootPart = plr.Character.HumanoidRootPart
-               local Position, OnScreen = game.Workspace.CurrentCamera:WorldToViewportPoint(RootPart.Position)
-               
-               if OnScreen then
-                  Box.Size = Vector2.new(1000 / Position.Z, 1500 / Position.Z)
-                  Box.Position = Vector2.new(Position.X - Box.Size.X / 2, Position.Y - Box.Size.Y / 2)
-                  Box.Visible = true
-               else
-                  Box.Visible = false
+VisualsTab:CreateToggle({
+   Name = "Enable ESP Boxes",
+   CurrentValue = false,
+   Flag = "ESP_Toggle",
+   Callback = function(Value)
+       ESPEnabled = Value
+       if ESPEnabled then
+           task.spawn(function()
+               while ESPEnabled do
+                   for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+                       if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                           if not v.Character:FindFirstChild("Highlight") then
+                               local Highlight = Instance.new("Highlight", v.Character)
+                               Highlight.FillTransparency = 0.5
+                               Highlight.OutlineTransparency = 0
+                               Highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                           end
+                       end
+                   end
+                   task.wait(1)
                end
-            else
-               Box.Visible = false
-            end
-         end)
-      end
-
-      for _, v in pairs(game.Players:GetChildren()) do
-         if v ~= Player then
-            CreateESP(v)
-         end
-      end
-   end,
-})
-
--- Combat Tab
-CombatTab:CreateSection("Combat Aids")
-
-CombatTab:CreateButton({
-   Name = "Load Simple Aimbot",
-   Callback = function()
-      local Camera = workspace.CurrentCamera
-      local RunService = game:GetService("RunService")
-      local UserInputService = game:GetService("UserInputService")
-      local Holding = false
-
-      UserInputService.InputBegan:Connect(function(Input)
-         if Input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Holding = true
-         end
-      end)
-
-      UserInputService.InputEnded:Connect(function(Input)
-         if Input.UserInputType == Enum.UserInputType.MouseButton2 then
-            Holding = false
-         end
-      end)
-
-      RunService.RenderStepped:Connect(function()
-         if Holding then
-            local NearestPlayer = nil
-            local ShortestDistance = math.huge
-
-            for _, v in pairs(game.Players:GetPlayers()) do
-               if v ~= Player and v.Character and v.Character:FindFirstChild("Head") then
-                  local Pos = Camera:WorldToViewportPoint(v.Character.Head.Position)
-                  local Magnitude = (Vector2.new(Pos.X, Pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                  if Magnitude < ShortestDistance then
-                     NearestPlayer = v
-                     ShortestDistance = Magnitude
-                  end
+               for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+                   if v.Character and v.Character:FindFirstChild("Highlight") then
+                       v.Character.Highlight:Destroy()
+                   end
                end
-            end
-
-            if NearestPlayer then
-               Camera.CFrame = CFrame.new(Camera.CFrame.Position, NearestPlayer.Character.Head.Position)
-            end
-         end
-      end)
+           end)
+       end
    end,
 })
 
--- Misc Tab
-MiscTab:CreateSection("Utilities")
+-- Scripts Tab
+ScriptsTab:CreateSection("External Scripts")
 
-MiscTab:CreateButton({
-   Name = "Infinite Yield",
+ScriptsTab:CreateButton({
+   Name = "Remote Spy",
    Callback = function()
-      loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/78n/SimpleSpy/main/SimpleSpySource.lua"))()
    end,
 })
 
-MiscTab:CreateButton({
-   Name = "Rejoin Server",
-   Callback = function()
-      game:GetService("TeleportService"):Teleport(game.PlaceId, Player)
-   end,
-})
-
-MiscTab:CreateButton({
-   Name = "Server Hop",
-   Callback = function()
-      local Http = game:GetService("HttpService")
-      local TPS = game:GetService("TeleportService")
-      local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
-      local _format = function(raw) return Http:JSONDecode(raw) end
-      local Servers = _format(game:HttpGet(Api))
-      if Servers then
-         for _, v in pairs(Servers.data) do
-            if v.playing < v.maxPlayers and v.id ~= game.JobId then
-               TPS:TeleportToPlaceInstance(game.PlaceId, v.id)
-            end
-         end
-      end
-   end,
-})
-
-Rayfield:Notify({
-   Title = "Success",
-   Content = "OP GUI Loaded Successfully",
-   Duration = 5,
-   Image = 4483362458,
-})
+Rayfield:LoadConfiguration()
