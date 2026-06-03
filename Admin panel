@@ -1,0 +1,186 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Prefix = "/"
+local AdminName = "Custom Admin"
+
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdminGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+
+local CommandBar = Instance.new("TextBox")
+CommandBar.Name = "CommandBar"
+CommandBar.Size = UDim2.new(0, 400, 0, 40)
+CommandBar.Position = UDim2.new(0.5, -200, 1, -100)
+CommandBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+CommandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+CommandBar.PlaceholderText = "Command hier eingeben..."
+CommandBar.Visible = false
+CommandBar.BorderSizePixel = 0
+CommandBar.Font = Enum.Font.SourceSans
+CommandBar.TextSize = 20
+CommandBar.Parent = ScreenGui
+
+local MenuFrame = Instance.new("ScrollingFrame")
+MenuFrame.Name = "CommandMenu"
+MenuFrame.Size = UDim2.new(0, 300, 0, 400)
+MenuFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MenuFrame.Visible = false
+MenuFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
+MenuFrame.Parent = ScreenGui
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = MenuFrame
+UIListLayout.Padding = UDim.new(0, 5)
+
+-- Notification
+StarterGui:SetCore("SendNotification", {
+    Title = AdminName,
+    Text = "admin erfolgreich geladen",
+    Duration = 5
+})
+
+-- Functions
+local function GetPlayer(name)
+    name = name:lower()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():sub(1, #name) == name or p.DisplayName:lower():sub(1, #name) == name then
+            return p
+        end
+    end
+    return nil
+end
+
+local function FindCurrency(player)
+    local stats = player:FindFirstChild("leaderstats") or player:FindFirstChild("Data")
+    if stats then
+        for _, v in pairs(stats:GetChildren()) do
+            local n = v.Name:lower()
+            if n:find("money") or n:find("geld") or n:find("cash") or n:find("coins") or n:find("points") then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+local Commands = {}
+
+Commands["speed"] = function(args)
+    local power = tonumber(args[1]) or 16
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = power
+    end
+end
+
+Commands["jump"] = function(args)
+    local power = tonumber(args[1]) or 50
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.JumpPower = power
+        LocalPlayer.Character.Humanoid.UseJumpPower = true
+    end
+end
+
+Commands["money"] = function(args)
+    local amount = tonumber(args[1]) or 999999
+    local currency = FindCurrency(LocalPlayer)
+    if currency then
+        currency.Value = amount
+    end
+end
+Commands["geld"] = Commands["money"]
+Commands["cash"] = Commands["money"]
+
+Commands["cmds"] = function()
+    MenuFrame.Visible = not MenuFrame.Visible
+end
+
+Commands["kill"] = function(args)
+    local target = GetPlayer(args[1])
+    if target and target.Character then
+        target.Character:BreakJoints()
+    end
+end
+
+Commands["tp"] = function(args)
+    local target = GetPlayer(args[1])
+    if target and target.Character and LocalPlayer.Character then
+        LocalPlayer.Character:MoveTo(target.Character.PrimaryPart.Position)
+    end
+end
+
+Commands["fly"] = function()
+    local c = LocalPlayer.Character
+    if not c then return end
+    local h = c:FindFirstChild("Humanoid")
+    local root = c:FindFirstChild("HumanoidRootPart")
+    if not h or not root then return end
+    
+    local bv = Instance.new("BodyVelocity", root)
+    bv.MaxForce = Vector3.new(1,1,1) * math.huge
+    bv.Velocity = Vector3.new(0,0,0)
+    
+    local bg = Instance.new("BodyGyro", root)
+    bg.MaxTorque = Vector3.new(1,1,1) * math.huge
+    bg.P = 10000
+    bg.D = 50
+    
+    RunService.RenderStepped:Connect(function()
+        if bv.Parent then
+            bv.Velocity = h.MoveDirection * 50
+            bg.CFrame = workspace.CurrentCamera.CFrame
+        end
+    end)
+end
+
+-- Command execution logic
+local function ExecuteCommand(input)
+    if input:sub(1, #Prefix) == Prefix then
+        input = input:sub(#Prefix + 1)
+    end
+    
+    local args = input:split(" ")
+    local cmdName = table.remove(args, 1):lower()
+    
+    if Commands[cmdName] then
+        Commands[cmdName](args)
+    end
+end
+
+-- Input handling
+UserInputService.InputBegan:Connect(function(input, processed)
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        CommandBar.Visible = true
+        CommandBar:CaptureFocus()
+    end
+end)
+
+CommandBar.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        ExecuteCommand(CommandBar.Text)
+    end
+    CommandBar.Text = ""
+    CommandBar.Visible = false
+end)
+
+LocalPlayer.Chatted:Connect(function(msg)
+    if msg:sub(1, #Prefix) == Prefix then
+        ExecuteCommand(msg)
+    end
+end)
+
+-- Fill Menu UI
+for cmd, _ in pairs(Commands) do
+    local btn = Instance.new("TextLabel")
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = Prefix .. cmd
+    btn.Parent = MenuFrame
+end
