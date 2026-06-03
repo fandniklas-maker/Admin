@@ -1,174 +1,148 @@
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
 local prefix = "/"
-local commandBarActive = false
+local isFlying = false
+local flySpeed = 50
+local cmdBarActive = false
 
--- Notification on Load
-StarterGui:SetCore("SendNotification", {
-    Title = "Admin System",
-    Text = "admin erfolgreich geladen",
-    Duration = 5
-})
-
--- UI Creation
+-- UI Setup
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AdminSystemUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Name = "DeltaAdminGui"
+screenGui.Parent = game:GetService("CoreGui")
 
--- Command Bar
-local cmdBar = Instance.new("TextBox")
-cmdBar.Name = "CommandBar"
-cmdBar.Parent = screenGui
-cmdBar.Size = UDim2.new(0, 400, 0, 40)
-cmdBar.Position = UDim2.new(0.5, -200, 0, -50) -- Hidden initially
-cmdBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-cmdBar.TextColor3 = Color3.fromRGB(255, 255, 255)
-cmdBar.PlaceholderText = "Enter Command here..."
-cmdBar.Font = Enum.Font.Code
-cmdBar.TextSize = 18
-cmdBar.BorderSizePixel = 2
-cmdBar.Visible = false
+-- Loading Notification
+local function showNotification(text)
+    local notification = Instance.new("TextLabel")
+    notification.Size = UDim2.new(0, 300, 0, 50)
+    notification.Position = UDim2.new(0.5, -150, 0.4, -25)
+    notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+    notification.Text = text
+    notification.Font = Enum.Font.Offset
+    notification.TextSize = 20
+    notification.BackgroundTransparency = 0.5
+    notification.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notification
 
--- Help Menu
-local helpMenu = Instance.new("Frame")
-helpMenu.Name = "HelpMenu"
-helpMenu.Parent = screenGui
-helpMenu.Size = UDim2.new(0, 300, 0, 400)
-helpMenu.Position = UDim2.new(0.5, -150, 0.5, -200)
-helpMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-helpMenu.Visible = false
+    task.wait(2)
+    TweenService:Create(notification, TweenInfo.new(1), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+    task.wait(1)
+    notification:Destroy()
+end
 
-local helpTitle = Instance.new("TextLabel")
-helpTitle.Parent = helpMenu
-helpTitle.Size = UDim2.new(1, 0, 0, 30)
-helpTitle.Text = "Commands List"
-helpTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-helpTitle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+-- Command Bar UI
+local cmdBarFrame = Instance.new("Frame")
+cmdBarFrame.Size = UDim2.new(0, 400, 0, 40)
+cmdBarFrame.Position = UDim2.new(0.5, -200, 0.9, -20)
+cmdBarFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+cmdBarFrame.BorderSizePixel = 0
+cmdBarFrame.Visible = false
+cmdBarFrame.Parent = screenGui
 
-local helpList = Instance.new("ScrollingFrame")
-helpList.Parent = helpMenu
-helpList.Position = UDim2.new(0, 0, 0, 30)
-helpList.Size = UDim2.new(1, 0, 1, -30)
-helpList.CanvasSize = UDim2.new(0, 0, 2, 0)
-helpList.ScrollBarThickness = 5
+local cmdInput = Instance.new("TextBox")
+cmdInput.Size = UDim2.new(1, -20, 1, 0)
+cmdInput.Position = UDim2.new(0, 10, 0, 0)
+cmdInput.BackgroundTransparency = 1
+cmdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+cmdInput.Text = ""
+cmdInput.PlaceholderText = "Enter command (prefix: " .. prefix .. ")"
+cmdInput.Font = Enum.Font.Code
+cmdInput.TextSize = 18
+cmdInput.TextXAlignment = Enum.TextXAlignment.Left
+cmdInput.Parent = cmdBarFrame
 
-local helpText = Instance.new("TextLabel")
-helpText.Parent = helpList
-helpText.Size = UDim2.new(1, -10, 1, 0)
-helpText.Position = UDim2.new(0, 5, 0, 5)
-helpText.BackgroundTransparency = 1
-helpText.TextColor3 = Color3.fromRGB(200, 200, 200)
-helpText.TextXAlignment = Enum.TextXAlignment.Left
-helpText.TextYAlignment = Enum.TextYAlignment.Top
-helpText.Font = Enum.Font.SourceSans
-helpText.TextSize = 16
-helpText.Text = [[
-/speed [num] - Set WalkSpeed
-/ws [num] - Set WalkSpeed
-/jumppower [num] - Set JumpPower
-/jp [num] - Set JumpPower
-/money [num] - Try to set Money
-/cash [num] - Try to set Cash
-/geld [num] - Try to set Geld
-/fly - Toggle Fly
-/noclip - Toggle NoClip
-/cmds - Show this menu
-/re - Reset Character
-/exit - Close Menu
-]]
+-- Fly Logic
+local bodyGyro, bodyVelocity
+local function toggleFly()
+    isFlying = not isFlying
+    character = player.Character
+    humanoid = character:FindFirstChildOfClass("Humanoid")
+    
+    if isFlying then
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.P = 9e4
+        bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bodyGyro.cframe = character.PrimaryPart.CFrame
+        bodyGyro.Parent = character.PrimaryPart
 
--- Logic Functions
-local flying = false
-local noclip = false
-
-local function setMoney(amount)
-    local stats = player:FindFirstChild("leaderstats")
-    if stats then
-        for _, val in pairs(stats:GetChildren()) do
-            local name = val.Name:lower()
-            if name == "money" or name == "cash" or name == "geld" or name == "coins" or name == "currency" then
-                val.Value = amount
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+        bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyVelocity.Parent = character.PrimaryPart
+        
+        humanoid.PlatformStand = true
+        
+        spawn(function()
+            while isFlying do
+                local camera = workspace.CurrentCamera
+                local moveDir = Vector3.new(0,0,0)
+                
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+                
+                bodyVelocity.velocity = moveDir * flySpeed
+                bodyGyro.cframe = camera.CFrame
+                RunService.RenderStepped:Wait()
             end
-        end
+        end)
+    else
+        if bodyGyro then bodyGyro:Destroy() end
+        if bodyVelocity then bodyVelocity:Destroy() end
+        humanoid.PlatformStand = false
     end
 end
 
-local function runCommand(input)
-    local args = string.split(input, " ")
+-- Command Execution
+local function executeCommand(input)
+    if not input:find(prefix) == 1 then return end
+    local args = input:sub(#prefix + 1):split(" ")
     local cmd = args[1]:lower()
 
-    if cmd == "/speed" or cmd == "/ws" then
-        local power = tonumber(args[2]) or 16
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = power
-        end
-    elseif cmd == "/jumppower" or cmd == "/jp" then
-        local power = tonumber(args[2]) or 50
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.UseJumpPower = true
-            player.Character.Humanoid.JumpPower = power
-        end
-    elseif cmd == "/money" or cmd == "/cash" or cmd == "/geld" then
-        local amount = tonumber(args[2]) or 999999
-        setMoney(amount)
-    elseif cmd == "/cmds" then
-        helpMenu.Visible = not helpMenu.Visible
-    elseif cmd == "/re" then
-        if player.Character then player.Character:BreakJoints() end
-    elseif cmd == "/exit" then
-        helpMenu.Visible = false
-    elseif cmd == "/noclip" then
-        noclip = not noclip
+    if cmd == "fly" then
+        toggleFly()
+    elseif cmd == "speed" then
+        local val = tonumber(args[2]) or 16
+        humanoid.WalkSpeed = val
+    elseif cmd == "jump" then
+        local val = tonumber(args[2]) or 50
+        humanoid.JumpPower = val
+        humanoid.UseJumpPower = true
     end
 end
 
 -- Input Handling
-UIS.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    
-    -- Toggle Command Bar with Left Control (Strg)
-    if input.KeyCode == Enum.KeyCode.LeftControl then
-        commandBarActive = not commandBarActive
-        cmdBar.Visible = commandBarActive
-        if commandBarActive then
-            cmdBar:CaptureFocus()
-            cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, 50), "Out", "Quad", 0.3, true)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        cmdBarActive = not cmdBarActive
+        cmdBarFrame.Visible = cmdBarActive
+        if cmdBarActive then
+            cmdInput:CaptureFocus()
         else
-            cmdBar:ReleaseFocus()
-            cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, -50), "In", "Quad", 0.3, true)
+            cmdInput:ReleaseFocus()
         end
     end
 end)
 
-cmdBar.FocusLost:Connect(function(enterPressed)
+cmdInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
-        runCommand(cmdBar.Text)
+        executeCommand(cmdInput.Text)
     end
-    cmdBar.Text = ""
-    commandBarActive = false
-    cmdBar:TweenPosition(UDim2.new(0.5, -200, 0, -50), "In", "Quad", 0.3, true, function()
-        cmdBar.Visible = false
-    end)
+    cmdInput.Text = ""
+    cmdBarFrame.Visible = false
+    cmdBarActive = false
 end)
 
-player.Chatted:Connect(function(msg)
-    if msg:sub(1,1) == prefix then
-        runCommand(msg)
-    end
-end)
-
--- NoClip Loop
-RunService.Stepped:Connect(function()
-    if noclip and player.Character then
-        for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end
-end)
+-- Initialize
+showNotification("Delta Admin Loaded Successfully")
