@@ -1,121 +1,88 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/78n/Example/main/SimpleGuiLib.lua"))()
+local Window = Library.CreateLib("Admin Panel", "Default")
+
+local Tab = Window:NewTab("Main")
+local Section = Tab:NewSection("Movement")
+
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
+local settings = {
+    flySpeed = 50,
+    walkSpeed = 16,
+    jumpPower = 50,
+    infJump = false,
+    flying = false
+}
 
--- State Variables
-local flying = false
-local flySpeed = 50
-local speedMultiplier = 16
-local jumpPower = 50
-local commandBarActive = false
+-- WalkSpeed
+Section:NewSlider("WalkSpeed", "Changes player speed", 250, 16, function(s)
+    settings.walkSpeed = s
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = s
+    end
+end)
 
--- UI Setup (Command Bar)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AdminCommandBar"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = game:GetService("CoreGui")
+-- Infinite Jump
+Section:NewToggle("Infinite Jump", "Jump as many times as you want", function(state)
+    settings.infJump = state
+end)
 
-local commandBar = Instance.new("TextBox")
-commandBar.Size = UDim2.new(0, 400, 0, 40)
-commandBar.Position = UDim2.new(0.5, -200, 0.8, 0)
-commandBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-commandBar.TextColor3 = Color3.fromRGB(255, 255, 255)
-commandBar.PlaceholderText = "Enter Command (fly, speed [val], jump [val])..."
-commandBar.Visible = false
-commandBar.Parent = screenGui
+UserInputService.JumpRequest:Connect(function()
+    if settings.infJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
 
 -- Fly Logic
-local bodyGyro, bodyVelocity
-local function toggleFly()
-    flying = not flying
-    if flying then
-        character = player.Character
-        local root = character:WaitForChild("HumanoidRootPart")
+local flyPart
+Section:NewToggle("Fly", "Toggle flight mode", function(state)
+    settings.flying = state
+    
+    if state then
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
         
-        bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.P = 9e4
-        bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bodyGyro.cframe = root.CFrame
-        bodyGyro.Parent = root
+        flyPart = Instance.new("BodyVelocity")
+        flyPart.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyPart.Velocity = Vector3.new(0, 0, 0)
+        flyPart.Parent = char.HumanoidRootPart
         
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
-        bodyVelocity.Parent = root
-        
-        humanoid.PlatformStand = true
+        local bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.P = 9e4
+        bg.CFrame = char.HumanoidRootPart.CFrame
+        bg.Parent = char.HumanoidRootPart
         
         task.spawn(function()
-            while flying do
+            while settings.flying and char:FindFirstChild("HumanoidRootPart") do
                 local camera = workspace.CurrentCamera
-                local moveDir = humanoid.MoveDirection
+                local moveDir = Vector3.new(0, 0, 0)
                 
-                if moveDir.Magnitude > 0 then
-                    bodyVelocity.velocity = camera.CFrame.LookVector * flySpeed
-                else
-                    bodyVelocity.velocity = Vector3.new(0, 0, 0)
-                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
                 
-                bodyGyro.cframe = camera.CFrame
+                flyPart.Velocity = moveDir * settings.flySpeed
+                bg.CFrame = camera.CFrame
                 RunService.RenderStepped:Wait()
             end
+            if flyPart then flyPart:Destroy() end
+            if bg then bg:Destroy() end
         end)
-    else
-        if bodyGyro then bodyGyro:Destroy() end
-        if bodyVelocity then bodyVelocity:Destroy() end
-        humanoid.PlatformStand = false
-    end
-end
-
--- Command Processor
-local function executeCommand(input)
-    local args = string.split(string.lower(input), " ")
-    local cmd = args[1]
-    
-    if cmd == "fly" then
-        toggleFly()
-    elseif cmd == "speed" then
-        local val = tonumber(args[2]) or 16
-        humanoid.WalkSpeed = val
-    elseif cmd == "jump" then
-        local val = tonumber(args[2]) or 50
-        humanoid.JumpPower = val
-        humanoid.UseJumpPower = true
-    end
-end
-
--- Input Handling
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Open Command Bar with Right Control
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        commandBarActive = not commandBarActive
-        commandBar.Visible = commandBarActive
-        if commandBarActive then
-            commandBar:CaptureFocus()
-        else
-            commandBar:ReleaseFocus()
-        end
     end
 end)
 
-commandBar.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        executeCommand(commandBar.Text)
-        commandBar.Text = ""
-    end
-    commandBar.Visible = false
-    commandBarActive = false
+Section:NewSlider("Fly Speed", "Speed of flight", 300, 10, function(s)
+    settings.flySpeed = s
 end)
 
--- Update character reference on respawn
-player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid = newChar:WaitForChild("Humanoid")
-    flying = false
+-- Reset on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid").WalkSpeed = settings.walkSpeed
 end)
